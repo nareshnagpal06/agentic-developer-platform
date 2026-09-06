@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# CDK / build artifacts
+infra/.venv/
+.venv/
+infra/cdk.out/
+cdk.out/
+*.egg-info/
+
+# Local state
+.adp-deploy-state.json

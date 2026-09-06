@@ -1,0 +1,11 @@
+{
+  "_comment": "Use the venv interpreter explicitly. Bare 'python3' resolves to the system Python, which has no aws_cdk installed, and the error it produces points at app.py rather than at the interpreter.",
+  "app": ".venv/bin/python app.py",
+  "watch": {
+    "include": ["**"],
+    "exclude": ["README.md", "cdk*.json", ".venv", "**/__pycache__", "cdk.out"]
+  },
+  "context": {
+    "@aws-cdk/core:newStyleStackSynthesis": true
+  }
+}

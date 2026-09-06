@@ -12,6 +12,7 @@
  * - operations: Infrastructure, deployment, monitoring
  */
 
+import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 import { resilientQuery } from './utils/resilientQuery';
 import { wrapUntrusted } from './utils/trust-boundary';
 import { initTokenManager, getToken, getTokenStatus, writeTokenFile } from './token-refresh';
@@ -60,6 +61,17 @@ import {
   KNOWLEDGE_LAYER_PROMPT,
   getKnowledgeLayerMcpConfig,
 } from './knowledge-layer-config';
+
+// Governance Layer MCP — route governed tool calls through the AI Governance
+// Gateway (Cedar authz + Guardrails admission scan + audit). Feature-flagged.
+import {
+  GOVERNANCE_ENABLED,
+  GOVERNANCE_SERVER_NAME,
+  GOVERNANCE_PROMPT,
+  getGovernanceMcpConfig,
+  isGovernanceConfigured,
+  prepareGovernance,
+} from './governance-config';
 
 // Beads module - distributed state management for agents
 import {
@@ -782,6 +794,10 @@ ${KNOWLEDGE_LAYER_ENABLED ? `
 ---
 
 ${KNOWLEDGE_LAYER_PROMPT}` : ''}
+${GOVERNANCE_ENABLED ? `
+---
+
+${GOVERNANCE_PROMPT}` : ''}
 
 ---
 
@@ -1150,6 +1166,15 @@ Now, complete the assigned task.`;
   if (AIDLC_ENABLED) {
     log('INFO', 'AIDLC install detected — Task tool enabled');
   }
+
+  // Acquire the governance service-account token once, before the query loop.
+  // No-op unless GOVERNANCE_ENABLED + gateway URL + svc secret are configured.
+  // Best-effort: on failure the governance MCP registers without auth and the
+  // gateway rejects its calls (fail-closed), so a token problem can't silently
+  // downgrade to ungoverned tool access.
+  if (isGovernanceConfigured()) {
+    await prepareGovernance(log);
+  }
   console.log('\n' + '═'.repeat(60));
   console.log(`Starting @agent-${AGENT_TYPE} Query`);
   console.log('═'.repeat(60) + '\n');
@@ -1207,9 +1232,21 @@ Now, complete the assigned task.`;
               ...(KNOWLEDGE_LAYER_ENABLED ? KNOWLEDGE_LAYER_TOOLS : []),
               ...(AIDLC_ENABLED ? ['Task'] : []),
             ],
-            ...(KNOWLEDGE_LAYER_ENABLED ? {
-              mcpServers: { [KNOWLEDGE_LAYER_SERVER_NAME]: getKnowledgeLayerMcpConfig() },
-            } : {}),
+            // Merge MCP servers: Knowledge Layer (Door) and, when configured,
+            // the Governance Gateway. Governance tools surface as
+            // mcp__governance__<name>; they aren't statically allowlisted because
+            // the entitled set is decided at runtime by Cedar (tools/list is
+            // filtered per-tenant), not fixed in the allowedTools array.
+            ...(() => {
+              const mcpServers: Record<string, McpServerConfig> = {};
+              if (KNOWLEDGE_LAYER_ENABLED) {
+                mcpServers[KNOWLEDGE_LAYER_SERVER_NAME] = getKnowledgeLayerMcpConfig();
+              }
+              if (isGovernanceConfigured()) {
+                mcpServers[GOVERNANCE_SERVER_NAME] = getGovernanceMcpConfig();
+              }
+              return Object.keys(mcpServers).length > 0 ? { mcpServers } : {};
+            })(),
             settingSources: ['project'],
             permissionMode: 'bypassPermissions',
             // Issue #2079: persist the session to disk so resilientQuery can

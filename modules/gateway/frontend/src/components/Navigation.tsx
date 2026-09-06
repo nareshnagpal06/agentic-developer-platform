@@ -118,6 +118,13 @@ export function Navigation() {
     navItems.push({ to: '/admin/access-requests', label: 'Access Requests', icon: '📋' });
   }
 
+  // Governance tool-registry for platform admins.
+  // The backend router is feature-flagged (GOVERNANCE_UI_ENABLED); the page
+  // shows an empty/erroring state harmlessly if the API is not enabled.
+  if (isPlatformAdmin()) {
+    navItems.push({ to: '/admin/governance', label: 'Governance', icon: '🛡️' });
+  }
+
   // Indexing Status page for platform admins (Issue #1424)
   if (features.indexing && isPlatformAdmin()) {
     navItems.push({ to: '/admin/indexing', label: 'Indexing Status', icon: '🔍' });

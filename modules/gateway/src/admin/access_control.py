@@ -47,6 +47,9 @@ _ORG_SCOPED_PERMISSIONS: frozenset[Permission] = frozenset(
         # then short-circuit the target_org_id check (which requires a truthy
         # allowed_org_id), passing the scope check entirely.
         Permission.AGENT_REGISTER,
+        # Governance tool review is org-scoped: an org-admin reviewer may only
+        # approve/reject tools fenced to their own org.
+        Permission.TOOL_APPROVE,
     }
 )
 

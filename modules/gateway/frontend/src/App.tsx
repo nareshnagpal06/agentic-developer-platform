@@ -36,6 +36,7 @@ const TenantOrgLinks = lazy(() => import('./pages/admin/TenantOrgLinks')); // Is
 const AgentActivity = lazy(() => import('./pages/AgentActivity')); // Issue #1457
 const AgentRunDashboard = lazy(() => import('./pages/AgentRunDashboard')); // Issue #3633
 const Knowledge = lazy(() => import('./pages/Knowledge')); // Issue #1794
+const Governance = lazy(() => import('./pages/Governance')); // Tool-governance registry
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function App() {
@@ -94,6 +95,7 @@ function App() {
               <Route path="/activity" element={<AgentActivity />} /> {/* Issue #1457 */}
               <Route path="/runs" element={<AgentRunDashboard />} /> {/* Issue #3633 */}
               <Route path="/knowledge" element={<FeatureGate feature="knowledge"><Knowledge /></FeatureGate>} /> {/* Issue #1794 */}
+              <Route path="/admin/governance" element={<AdminGuard><Governance /></AdminGuard>} /> {/* Tool-governance registry */}
             </Route>
           </Route>
 

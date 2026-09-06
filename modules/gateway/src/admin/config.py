@@ -54,6 +54,11 @@ class Permission(str, Enum):
     # every role that can edit any org attribute.
     AGENT_REGISTER = "agent:register"
 
+    # Governance tool-registry review. Held by a reviewer who may approve/reject
+    # governed tools in the Governance tab. Distinct from ORG_UPDATE so the
+    # reviewer capability can be granted without broader org-edit authority.
+    TOOL_APPROVE = "tool:approve"
+
 
 # Role to permissions mapping
 ROLE_PERMISSIONS: dict[AdminRole, set[Permission]] = {
@@ -75,6 +80,7 @@ ROLE_PERMISSIONS: dict[AdminRole, set[Permission]] = {
         Permission.USER_MANAGE,
         Permission.METRICS_READ,
         Permission.AGENT_REGISTER,
+        Permission.TOOL_APPROVE,
     },
     AdminRole.ORG_ADMIN: {
         Permission.ORG_READ,
@@ -91,6 +97,9 @@ ROLE_PERMISSIONS: dict[AdminRole, set[Permission]] = {
         # Issue #3989: an org admin may register agents into their OWN org; the
         # target_org_id scope check in check_permission() enforces the boundary.
         Permission.AGENT_REGISTER,
+        # An org admin may review governed tools within their OWN org; the
+        # target_org_id scope check in check_permission() enforces the boundary.
+        Permission.TOOL_APPROVE,
     },
     AdminRole.DEPT_ADMIN: {
         Permission.BUDGET_READ,

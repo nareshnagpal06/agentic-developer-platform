@@ -1,0 +1,159 @@
+# ADP Governance Layer — the whole governed-tools config, in one file.
+#
+# A platform admin edits this file and deploys. It declares which Cognito pool to
+# trust, which tenants (ADP orgs) exist, which tools are governed, and the two
+# enforcement switches.
+#
+# Integration note: this is the INPUT. On deploy it generates the OUTPUTS —
+# Cedar policies (enforcement), Gateway targets (routing), registry records
+# (catalogue/review), and the Bedrock guardrail (scan). See README.md.
+
+platform:
+  name: adp-governance
+  region: us-east-1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY — point at ADP's EXISTING Cognito pool. Do NOT create a new one.
+#
+# The governance gateway validates the same JWT an ADP agent already carries.
+# ADP's tenant lives in the custom:org_id claim (verified against ADP's
+# Pre-Token-Generation Lambda) — NOT custom:tenant (that was the standalone
+# project's claim).
+#
+# Fill these from the deployed environment:
+#   aws ssm get-parameter --name /adp/<env>/cognito/user-pool-id
+#   aws ssm get-parameter --name /adp/<env>/cognito/app-client-id
+# ─────────────────────────────────────────────────────────────────────────────
+# Filled from the deployed ADP account 006230620263 (pool bedrockgw-dev-users).
+# For a different deployment, replace with:
+#   aws cognito-idp list-user-pools --max-results 20   (find bedrockgw-dev-users)
+#   COGNITO_CLIENT_ID from the github-auth-broker Lambda env
+cognito:
+  user_pool_id: us-east-1_52NjxYvvY
+  app_client_id: 1d1ujtienrnd0gfr8id2t9tfc9
+  tenant_claim: "custom:org_id"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENFORCEMENT MODE (the policy engine — Cedar).
+#
+#   LOG_ONLY  policies are evaluated, decisions are recorded, nothing is blocked.
+#             Every tenant still sees every tool. Prove a policy set is right
+#             before it can break anyone's work.
+#   ENFORCE   decisions are enforced. An unentitled tool is not merely refused,
+#             it is ABSENT from tools/list.
+#
+# Start LOG_ONLY, watch the audit trail, then flip to ENFORCE. There is no
+# DISABLED value; to stop enforcing a tool, remove its policy (remove the tool).
+# ─────────────────────────────────────────────────────────────────────────────
+governance:
+  enforcement_mode: ENFORCE
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE CATALOGUE / REGISTRY — what exists, who owns it, whether it was reviewed.
+#
+# Honest boundary: the AgentCore Gateway does NOT consult the registry, so an
+# APPROVED record is not, by itself, a technical precondition for a tool being
+# callable — Cedar is. The registry is a review record + workflow.
+#
+#   auto_approval: false            submitted records wait in PENDING until a
+#                                   reviewer approves. Service default, verified.
+#   reviewer_group                  Cognito group whose members may approve/reject.
+#                                   Reads are open (scoped to tenant); acting on
+#                                   the queue requires membership.
+#   require_approval_to_enable      ADP ENHANCEMENT. When true, a tool's Cedar
+#                                   policy is only generated once its record is
+#                                   APPROVED — so "Approve" genuinely turns the
+#                                   tool on. When false (default), Cedar fences by
+#                                   tenant regardless and approval is review-only.
+# ─────────────────────────────────────────────────────────────────────────────
+registry:
+  name: adp_governance_registry
+  auto_approval: false
+  reviewer_group: platform-reviewers
+  require_approval_to_enable: false
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE ADMISSION SCAN — this one IS in the request path.
+#
+# A Gateway request interceptor scans tool ARGUMENTS (recursively) via a Bedrock
+# Guardrail (PROMPT_ATTACK at HIGH) before the tool runs. A refusal here actually
+# refuses.
+#
+#   OBSERVE   scan every call, log the verdict, allow it through anyway.
+#   ENFORCE   refuse a call whose content trips the scan.
+#
+#   fail_open: false   an unavailable scanner BLOCKS the call. Fail-closed is the
+#                      right posture for a security control — a Bedrock outage
+#                      becomes a tool outage. Stated, not buried.
+#
+# Note: OBSERVE/ENFORCE are NOT the same words as governance.enforcement_mode.
+# Different mechanism, different failure mode — sharing vocabulary would make a
+# misconfiguration unreadable in a log line.
+# ─────────────────────────────────────────────────────────────────────────────
+admission_scan:
+  mode: ENFORCE
+  fail_open: false
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TENANTS — ADP orgs (the custom:org_id values). A tool's `tenant` must be one
+# of these. These are illustrative; replace with your real ADP orgs.
+# ─────────────────────────────────────────────────────────────────────────────
+tenants:
+  - name: finance
+    admins: ["john@company.com"]
+  - name: engineering
+    admins: ["sarah@company.com"]
+  # The tenant an ADP agent runs as (custom:org_id from the onboarded GitHub
+  # user). Added so a real agent is entitled to a governance tool end-to-end.
+  - name: nareshnagpal06
+    admins: ["nareshnagpal06"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TOOLS — one governed tool per block. Each generates a Gateway target, a Cedar
+# policy fencing it to its tenant, and a registry record owned by `owner`.
+#
+# These two are examples carried over from the standalone project to show the
+# shape. Replace with ADP's real tools (domain-app tools, MCP-Hub-fronted tools).
+# ─────────────────────────────────────────────────────────────────────────────
+tools:
+  - name: finance-reports
+    tenant: finance
+    owner: john@company.com
+    handler: finance_reports
+    description: >-
+      Returns quarterly finance reports including revenue, operating expense
+      and margin for a given quarter.
+    arguments:
+      quarter:
+        type: string
+        description: "Quarter to report on, e.g. q1 or q2"
+        required: true
+
+  - name: jira-search
+    tenant: engineering
+    owner: sarah@company.com
+    handler: jira_search
+    description: >-
+      Searches Jira issues by keyword and returns matching issue keys,
+      summaries and statuses.
+    arguments:
+      query:
+        type: string
+        description: "Keyword to search issue summaries and keys for"
+        required: false
+
+  # Fenced to the agent's tenant (nareshnagpal06) so a real ADP agent is
+  # entitled to it through governance — this is the tool that proves the
+  # end-to-end integration.
+  - name: repo-insights
+    tenant: nareshnagpal06
+    owner: nareshnagpal06
+    handler: repo_insights
+    description: >-
+      Returns lightweight insights about a repository — a short summary and a
+      few suggested next actions for an agent working on it.
+    arguments:
+      repo:
+        type: string
+        description: "Repository name, e.g. obsidian-notes"
+        required: true

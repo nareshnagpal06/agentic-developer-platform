@@ -193,6 +193,49 @@ variable "knowledge_layer_enabled" {
 }
 
 # -----------------------------------------------------------------------------
+# Tool Governance (plug-and-play governed MCP gateway)
+# -----------------------------------------------------------------------------
+
+variable "governance_enabled" {
+  description = <<-DESC
+    Enable the Tool Governance gateway for agent-worker pods. When true, adds
+    GOVERNANCE_* env vars to the ScaledJob agent-worker container so the agent
+    routes its governed tool calls THROUGH the AI Governance Gateway (Cedar
+    authorization + Bedrock Guardrails admission scan + audit). The agent
+    authenticates as a per-tenant service-account Cognito user whose ID token
+    carries custom:org_id (the tenant claim Cedar reads). Default false — flip
+    on after the tool-governance module is deployed and the service-account
+    secret exists. Governed tools surface to the agent as mcp__governance__*.
+  DESC
+  type        = bool
+  default     = false
+}
+
+variable "governance_mcp_url" {
+  description = "AI Governance Gateway MCP endpoint URL (AgentCore Gateway). Required when governance_enabled=true."
+  type        = string
+  default     = ""
+}
+
+variable "governance_svc_secret" {
+  description = "Secrets Manager name/ARN of the service-account Cognito creds ({username,password,org_id}). Required when governance_enabled=true."
+  type        = string
+  default     = ""
+}
+
+variable "governance_cognito_pool" {
+  description = "Cognito User Pool ID the governance gateway validates tokens against (ADP's pool). Required when governance_enabled=true."
+  type        = string
+  default     = ""
+}
+
+variable "governance_cognito_client" {
+  description = "Cognito App Client ID used for the service-account ADMIN_USER_PASSWORD_AUTH login. Required when governance_enabled=true."
+  type        = string
+  default     = ""
+}
+
+# -----------------------------------------------------------------------------
 # OpenTelemetry / Observability (Issue #1630)
 # -----------------------------------------------------------------------------
 

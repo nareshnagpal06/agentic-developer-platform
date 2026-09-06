@@ -73,6 +73,27 @@ locals {
     "                    value: http://context-mcp.agent-context.svc.cluster.local:5100",
   ]) : ""
 
+  # Tool Governance env vars for agent-worker container.
+  # Conditionally included in the ScaledJob YAML when governance_enabled=true.
+  # Routes the agent's governed tool calls THROUGH the AI Governance Gateway
+  # (Cedar authz + Bedrock Guardrails scan + audit). The agent authenticates as
+  # a per-tenant service-account Cognito user (creds in Secrets Manager); its ID
+  # token carries custom:org_id, which Cedar reads to fence tools to the tenant.
+  governance_env_block = var.governance_enabled ? join("\n", [
+    "                  # ── Tool Governance ─────────────────────────────────────────────",
+    "                  # Governed MCP gateway: Cedar authz + Guardrails scan + audit.",
+    "                  - name: GOVERNANCE_ENABLED",
+    "                    value: \"1\"",
+    "                  - name: GOVERNANCE_MCP_URL",
+    "                    value: ${var.governance_mcp_url}",
+    "                  - name: GOVERNANCE_SVC_SECRET",
+    "                    value: ${var.governance_svc_secret}",
+    "                  - name: GOVERNANCE_COGNITO_POOL",
+    "                    value: ${var.governance_cognito_pool}",
+    "                  - name: GOVERNANCE_COGNITO_CLIENT",
+    "                    value: ${var.governance_cognito_client}",
+  ]) : ""
+
   # OpenTelemetry env vars for agent-worker container (#1630).
   # Conditionally included in the ScaledJob YAML when enable_agent_otel=true.
   # Uses join() to avoid nested heredoc syntax issues in HCL ternary.
@@ -216,6 +237,7 @@ locals {
                     value: ${aws_api_gateway_stage.dev.invoke_url}/agent/trigger
 ${local.otel_env_block}
 ${local.knowledge_layer_env_block}
+${local.governance_env_block}
                 resources:
                   requests:
                     cpu: "1"

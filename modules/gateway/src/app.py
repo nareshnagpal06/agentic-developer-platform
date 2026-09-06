@@ -46,6 +46,7 @@ UNIT_MODULES = [
     "src.knowledge.github_repos",  # Issue #2045: GitHub repo picker
     "src.features.routes",  # Issue #3566: Feature-flag endpoint
     "src.auth.gitlab_sso",  # Issue #3775: GitLab SSO JWT minting + JWKS
+    "src.governance.routes",  # Governance tool-registry (gated by GOVERNANCE_UI_ENABLED)
 ]
 
 
@@ -62,6 +63,7 @@ async def lifespan(app: FastAPI):
         try:
             # Import all models so Base.metadata knows about them
             import src.admin.models  # noqa: F401
+            import src.governance.models  # noqa: F401  # governance tool-registry
             import src.shared.models.audit  # noqa: F401  # Issue #446
             import src.shared.models.budget  # noqa: F401
             import src.shared.models.organization  # noqa: F401
