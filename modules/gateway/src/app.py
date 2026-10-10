@@ -97,6 +97,16 @@ UNIT_MODULES = [
     # authorization it performs is reviewed on its own terms rather than inherited
     # from a router whose other routes only touch our own records.
     "src.agentauth.github_operation_routes",
+    # Mediated governed tool calls. Its own module for the same reason
+    # github_operation_routes is: it shares the /self prefix but it is the only
+    # route there that reaches an external governance gateway and mints a bearer
+    # token while doing it, so its authorization is reviewed on its own terms
+    # rather than inherited. Inert until an operator sets ADP_GOVERNED_TOOLS_URL.
+    "src.agentauth.governed_tools_service",
+    # The OIDC discovery document the governed gateway's CUSTOM_JWT authorizer
+    # fetches. Exposes `well_known_router` only, so it mounts prefix-free at the
+    # host root; a /.well-known/ path under a module prefix is not discoverable.
+    "src.agentauth.governed_tools_discovery",
     # #5301: the delivering run binds its own implementation PR to its story,
     # authenticated by the run credential rather than a self-declared run header.
     "src.agentauth.pr_binding_routes",

@@ -74,6 +74,12 @@ const RUN_SPECIFIC_INTERPOLATIONS = [
  *                                           .adp-rules files, never the issue
  *   - KNOWLEDGE_LAYER_*                   — module constants from env
  *   - MEDIATED_GITHUB_*                   — module constants from env (#5223)
+ *   - governedToolsActive()               — a call, but over module constants
+ *                                           read from env at import; it reads
+ *                                           nothing issue-derived and returns
+ *                                           the same value for every run in a
+ *                                           pod
+ *   - GOVERNED_TOOLS_PROMPT               — module constant
  */
 const INVARIANT_INTERPOLATIONS = [
   'AGENT_TYPE',
@@ -83,6 +89,8 @@ const INVARIANT_INTERPOLATIONS = [
   'KNOWLEDGE_LAYER_PROMPT',
   'MEDIATED_GITHUB_ENABLED',
   'MEDIATED_GITHUB_PROMPT',
+  'governedToolsActive()',
+  'GOVERNED_TOOLS_PROMPT',
 ];
 
 /** Every `${...}` interpolation in `text`, innermost-first, de-duplicated. */

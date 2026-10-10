@@ -129,6 +129,16 @@ import {
   getKnowledgeLayerMcpConfig,
 } from './knowledge-layer-config';
 
+// Governed tools MCP — register the governance gateway as agent MCP tools
+// (feature-flagged, default off).
+import {
+  GOVERNED_TOOLS,
+  GOVERNED_TOOLS_SERVER_NAME,
+  GOVERNED_TOOLS_PROMPT,
+  getGovernedToolsMcpConfig,
+  governedToolsActive,
+} from './governed-tools-config';
+
 // Mediated GitHub operations — Issue #5223: this run has no GitHub token, so the
 // agent must be told the helper that replaces `git push`/`gh pr create`.
 import { MEDIATED_GITHUB_ENABLED, MEDIATED_GITHUB_PROMPT, isMediatedRun } from './mediated-github-config';
@@ -1006,7 +1016,10 @@ You have access to skills in \`.claude/skills/\`. Each skill has a \`SKILL.md\` 
 ${KNOWLEDGE_LAYER_ENABLED ? `
 ---
 
-${KNOWLEDGE_LAYER_PROMPT}` : ''}${MEDIATED_GITHUB_ENABLED ? `
+${KNOWLEDGE_LAYER_PROMPT}` : ''}${governedToolsActive() ? `
+---
+
+${GOVERNED_TOOLS_PROMPT}` : ''}${MEDIATED_GITHUB_ENABLED ? `
 ---
 
 ${MEDIATED_GITHUB_PROMPT}` : ''}
@@ -1629,10 +1642,19 @@ Now, complete the assigned task.`;
             allowedTools: [
               'Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'Skill', 'TodoWrite',
               ...(KNOWLEDGE_LAYER_ENABLED ? KNOWLEDGE_LAYER_TOOLS : []),
+              ...(governedToolsActive() ? GOVERNED_TOOLS : []),
               ...(AIDLC_ENABLED ? ['Task'] : []),
             ],
-            ...(KNOWLEDGE_LAYER_ENABLED ? {
-              mcpServers: { [KNOWLEDGE_LAYER_SERVER_NAME]: getKnowledgeLayerMcpConfig() },
+            // One merged `mcpServers` rather than two conditional spreads: two
+            // spreads of the same key would mean the later one replaces the
+            // earlier, silently unmounting the Knowledge Layer whenever
+            // governed tools are enabled. Omitted entirely when neither is on,
+            // preserving today's behaviour.
+            ...(KNOWLEDGE_LAYER_ENABLED || governedToolsActive() ? {
+              mcpServers: {
+                ...(KNOWLEDGE_LAYER_ENABLED ? { [KNOWLEDGE_LAYER_SERVER_NAME]: getKnowledgeLayerMcpConfig() } : {}),
+                ...(governedToolsActive() ? { [GOVERNED_TOOLS_SERVER_NAME]: getGovernedToolsMcpConfig() } : {}),
+              },
             } : {}),
             settingSources: ['project'],
             permissionMode: 'bypassPermissions',

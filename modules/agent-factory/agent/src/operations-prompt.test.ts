@@ -54,6 +54,12 @@ describe('hosted operations delivery instructions', () => {
       AGENT_TYPE: agentType, agentDescriptions: { operations: 'Delivery coordinator' },
       rules, KNOWLEDGE_LAYER_ENABLED: false, KNOWLEDGE_LAYER_PROMPT: '',
       MEDIATED_GITHUB_ENABLED: mediated, MEDIATED_GITHUB_PROMPT,
+      // Governed tools are off in these fixtures: this suite asserts the
+      // operations lifecycle, and the mounted-tool surface belongs to
+      // governed-tools-config.test.ts. A function rather than a flag because
+      // the production prompt gates on governedToolsActive(), which also
+      // requires a protected run.
+      governedToolsActive: () => false, GOVERNED_TOOLS_PROMPT: '',
       issue: { number: 42, title: 'Drive a delivery wave', body: 'Review and accept both stories.' },
       ISSUE_NUMBER: '42', mainIssueInfo: '', memoryCtx: '', commentsContext: '', beadsPrimeContext: '',
       wrapUntrusted, developerCheckpointGuidance, developerRecoveryContext, reviewCyclePrompt, process: { env: {} },

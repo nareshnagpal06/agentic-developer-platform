@@ -22,6 +22,7 @@ import { SignatureV4 } from '@smithy/signature-v4';
 import { Hash } from '@smithy/hash-node';
 import { workerAwsCredentialProvider, workerIdentityHeaders, readIdentityToken, gatewaySigningRegion } from './lib/runIdentity';
 import { handleKnowledgeBridge } from './lib/knowledgeBridge';
+import { handleGovernedToolsBridge } from './lib/governedToolsBridge';
 import { proxyPort } from './lib/proxyPort';
 import { responsesOutputDefault, withResponsesOutputBound } from './lib/responsesOutputBound';
 
@@ -61,6 +62,11 @@ const signer = new SignatureV4({
 });
 
 const server = http.createServer(async (req, res) => {
+  // Must precede handleKnowledgeBridge: that handler claims every `/__run/`
+  // path and 404s the ones absent from its own table, so a governed-tools URL
+  // would be answered 404 by it and never reach this handler if the order were
+  // reversed. Narrow prefix first.
+  if (await handleGovernedToolsBridge(req, res)) return;
   if (await handleKnowledgeBridge(req, res)) return;
   // Health-check endpoint for entrypoint readiness probe (issue #747)
   if (req.url === '/__health') {
